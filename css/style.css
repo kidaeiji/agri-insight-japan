@@ -1,0 +1,576 @@
+/* ===================================================
+   農作物需給分析システム - スタイルシート
+   =================================================== */
+
+:root {
+  --primary: #2E7D32;
+  --primary-light: #4CAF50;
+  --primary-dark: #1B5E20;
+  --secondary: #558B2F;
+  --accent: #F9A825;
+  --accent-dark: #F57F17;
+  --bg: #F5F7F2;
+  --bg-card: #FFFFFF;
+  --bg-nav: #1B5E20;
+  --text: #212121;
+  --text-sub: #616161;
+  --text-light: #9E9E9E;
+  --border: #E0E0E0;
+  --shadow: 0 2px 8px rgba(0,0,0,0.10);
+  --shadow-md: 0 4px 16px rgba(0,0,0,0.12);
+  --risk-high: #D32F2F;
+  --risk-high-bg: #FFEBEE;
+  --risk-med: #F57C00;
+  --risk-med-bg: #FFF3E0;
+  --risk-low: #388E3C;
+  --risk-low-bg: #E8F5E9;
+  --radius: 10px;
+  --radius-sm: 6px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', 'Yu Gothic', Meiryo, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* ===================================================
+   ナビゲーション
+   =================================================== */
+.navbar {
+  position: sticky; top: 0; z-index: 100;
+  background: var(--bg-nav);
+  padding: 0 20px;
+  display: flex; align-items: center; gap: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  min-height: 56px;
+  flex-wrap: wrap;
+}
+
+.nav-brand {
+  display: flex; align-items: center; gap: 8px;
+  color: white; font-weight: 700; font-size: 17px;
+  margin-right: 16px; white-space: nowrap;
+  padding: 8px 0;
+}
+.brand-icon { font-size: 22px; }
+
+.nav-links {
+  display: flex; gap: 2px; flex-wrap: wrap;
+}
+
+.nav-btn {
+  background: transparent; border: none;
+  color: rgba(255,255,255,0.75);
+  padding: 8px 14px; border-radius: var(--radius-sm);
+  cursor: pointer; font-size: 13px; font-weight: 500;
+  transition: all 0.2s;
+  font-family: inherit;
+  white-space: nowrap;
+}
+.nav-btn:hover { background: rgba(255,255,255,0.12); color: white; }
+.nav-btn.active { background: rgba(255,255,255,0.18); color: white; font-weight: 700; }
+
+/* ===================================================
+   ページレイアウト
+   =================================================== */
+.page {
+  max-width: 1280px; margin: 0 auto;
+  padding: 24px 20px 48px;
+}
+
+.page-header { margin-bottom: 24px; }
+.page-header h1 { font-size: 22px; font-weight: 700; color: var(--primary-dark); }
+.page-header .subtitle { color: var(--text-sub); margin-top: 4px; font-size: 14px; }
+.data-badge {
+  display: inline-block; margin-top: 6px;
+  background: var(--primary-light); color: white;
+  padding: 2px 10px; border-radius: 12px; font-size: 11px;
+}
+.forecast-badge {
+  display: inline-block; margin-top: 6px; margin-left: 6px;
+  background: var(--accent); color: #333;
+  padding: 2px 10px; border-radius: 12px; font-size: 11px;
+}
+
+/* ===================================================
+   KPIカード
+   =================================================== */
+.metrics-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px; margin-bottom: 24px;
+}
+
+.metric-card {
+  background: var(--bg-card); border-radius: var(--radius);
+  padding: 18px 20px; box-shadow: var(--shadow);
+  border-left: 4px solid var(--border);
+  display: flex; flex-direction: column; gap: 4px;
+}
+.metric-card.danger { border-left-color: var(--risk-high); }
+.metric-card.warning { border-left-color: var(--risk-med); }
+.metric-card.info { border-left-color: #1976D2; }
+.metric-card.success { border-left-color: var(--primary-light); }
+
+.metric-top { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+.metric-icon { font-size: 26px; }
+.metric-value { font-size: 26px; font-weight: 700; color: var(--text); }
+.metric-label { font-size: 12px; font-weight: 600; color: var(--text-sub); text-transform: uppercase; letter-spacing: 0.5px; }
+.metric-detail { font-size: 12px; color: var(--text-light); }
+
+/* ===================================================
+   セクションカード
+   =================================================== */
+.section-card {
+  background: var(--bg-card); border-radius: var(--radius);
+  padding: 22px 24px; margin-bottom: 20px;
+  box-shadow: var(--shadow);
+}
+.section-card h2 { font-size: 17px; font-weight: 700; color: var(--primary-dark); margin-bottom: 6px; }
+.section-card h3 { font-size: 15px; font-weight: 700; color: var(--text); margin-bottom: 12px; }
+.section-desc { color: var(--text-sub); font-size: 13px; margin-bottom: 16px; }
+
+/* ===================================================
+   チャートグリッド
+   =================================================== */
+.charts-row {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+  gap: 16px; margin-bottom: 20px;
+}
+.chart-card {
+  background: var(--bg-card); border-radius: var(--radius);
+  padding: 18px 20px; box-shadow: var(--shadow);
+}
+.chart-card h3 { font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 12px; }
+.chart-container {
+  position: relative; width: 100%; height: 260px;
+}
+.chart-container canvas { width: 100% !important; height: 100% !important; }
+
+.chart-full { width: 100%; }
+.chart-full .chart-container { height: 320px; }
+
+/* ===================================================
+   リスクマトリクス
+   =================================================== */
+.risk-table-wrap { overflow-x: auto; }
+.risk-table {
+  width: 100%; border-collapse: collapse;
+  font-size: 13px;
+}
+.risk-table th {
+  background: var(--primary-dark); color: white;
+  padding: 10px 12px; text-align: center;
+  font-weight: 600; white-space: nowrap;
+}
+.risk-table th:first-child { text-align: left; }
+.risk-table td {
+  padding: 10px 12px; border-bottom: 1px solid var(--border);
+  text-align: center;
+}
+.risk-table td:first-child { text-align: left; }
+.risk-table tr:hover td { background: #F9FBF7; }
+.risk-table tr { cursor: pointer; }
+
+.crop-name { font-weight: 600; display: flex; align-items: center; gap: 6px; }
+.crop-dot {
+  width: 10px; height: 10px; border-radius: 50%;
+  display: inline-block; flex-shrink: 0;
+}
+
+.cell-high { background: var(--risk-high-bg) !important; color: var(--risk-high); font-weight: 600; }
+.cell-medium { background: var(--risk-med-bg) !important; color: var(--risk-med); font-weight: 600; }
+.cell-low { background: var(--risk-low-bg) !important; color: var(--risk-low); }
+
+.risk-badge {
+  display: inline-block; padding: 3px 10px; border-radius: 12px;
+  font-size: 12px; font-weight: 700; white-space: nowrap;
+}
+.badge-high { background: var(--risk-high); color: white; }
+.badge-medium { background: var(--risk-med); color: white; }
+.badge-low { background: var(--risk-low); color: white; }
+
+/* ===================================================
+   アラートセクション
+   =================================================== */
+.alerts-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 14px;
+}
+.alert-item {
+  border-radius: var(--radius-sm); padding: 16px;
+  border-left: 4px solid;
+}
+.alert-item.high { background: var(--risk-high-bg); border-left-color: var(--risk-high); }
+.alert-item.medium { background: var(--risk-med-bg); border-left-color: var(--risk-med); }
+.alert-item.low { background: var(--risk-low-bg); border-left-color: var(--risk-low); }
+.alert-item.info { background: #E3F2FD; border-left-color: #1976D2; }
+
+.alert-header { font-size: 11px; font-weight: 700; letter-spacing: 0.5px; margin-bottom: 6px; color: var(--text-sub); }
+.alert-item h4 { font-size: 14px; font-weight: 700; margin-bottom: 6px; color: var(--text); }
+.alert-item p { font-size: 13px; color: var(--text-sub); line-height: 1.6; }
+
+/* ===================================================
+   作物セレクター
+   =================================================== */
+.crop-selector-wrap { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
+.crop-btn {
+  padding: 6px 14px; border-radius: 20px;
+  border: 2px solid; background: white;
+  font-size: 13px; font-weight: 500; cursor: pointer;
+  transition: all 0.2s; font-family: inherit;
+}
+.crop-btn:hover { opacity: 0.85; }
+.crop-btn.active { color: white !important; }
+
+/* ===================================================
+   需要・供給分析ページ
+   =================================================== */
+.two-col {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  gap: 16px; margin-bottom: 20px;
+}
+
+.trend-cards {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 14px; margin-top: 16px;
+}
+.trend-card {
+  border-radius: var(--radius-sm); padding: 16px;
+  border: 1px solid var(--border);
+}
+.trend-card-header {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 10px;
+}
+.trend-card-icon { font-size: 22px; }
+.trend-card-title { font-size: 14px; font-weight: 700; }
+.trend-card-category {
+  font-size: 10px; color: var(--text-light);
+  background: var(--bg); padding: 2px 8px; border-radius: 10px;
+}
+.trend-card p { font-size: 13px; color: var(--text-sub); line-height: 1.6; margin-bottom: 8px; }
+.impact-badge {
+  font-size: 11px; font-weight: 600;
+  padding: 2px 8px; border-radius: 10px;
+  display: inline-block;
+}
+.impact-high { background: var(--risk-high-bg); color: var(--risk-high); }
+.impact-medium { background: var(--risk-med-bg); color: var(--risk-med); }
+.impact-low { background: var(--risk-low-bg); color: var(--risk-low); }
+
+/* ===================================================
+   需給ギャップ
+   =================================================== */
+.gap-summary-cards {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px; margin-bottom: 20px;
+}
+.gap-card {
+  background: var(--bg-card); border-radius: var(--radius-sm);
+  padding: 14px 16px; box-shadow: var(--shadow);
+  border-top: 4px solid var(--border);
+  cursor: pointer; transition: transform 0.15s;
+}
+.gap-card:hover { transform: translateY(-2px); }
+.gap-card.risk-high { border-top-color: var(--risk-high); }
+.gap-card.risk-medium { border-top-color: var(--risk-med); }
+.gap-card.risk-low { border-top-color: var(--risk-low); }
+.gap-card .crop-label { font-size: 15px; font-weight: 700; margin-bottom: 6px; }
+.gap-card .ss-value { font-size: 22px; font-weight: 700; }
+.gap-card .ss-unit { font-size: 11px; color: var(--text-sub); }
+.gap-card .risk-label { font-size: 11px; font-weight: 600; margin-top: 4px; }
+.gap-card.risk-high .risk-label { color: var(--risk-high); }
+.gap-card.risk-medium .risk-label { color: var(--risk-med); }
+.gap-card.risk-low .risk-label { color: var(--risk-low); }
+
+/* ===================================================
+   作物詳細ページ
+   =================================================== */
+.detail-header {
+  display: flex; align-items: center; gap: 14px;
+  margin-bottom: 20px;
+}
+.detail-crop-icon {
+  width: 48px; height: 48px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 24px; flex-shrink: 0;
+}
+
+.info-row {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px; margin-bottom: 16px;
+}
+.info-box {
+  background: var(--bg); border-radius: var(--radius-sm);
+  padding: 10px 12px; text-align: center;
+}
+.info-box .val { font-size: 20px; font-weight: 700; color: var(--primary-dark); }
+.info-box .lbl { font-size: 11px; color: var(--text-sub); margin-top: 2px; }
+
+.risk-factor-list { list-style: none; padding: 0; }
+.risk-factor-list li {
+  padding: 8px 12px; margin-bottom: 6px;
+  background: var(--risk-high-bg); border-radius: var(--radius-sm);
+  font-size: 13px; color: var(--text);
+  border-left: 3px solid var(--risk-high);
+  display: flex; align-items: flex-start; gap: 6px;
+}
+.risk-factor-list li::before { content: '⚠'; font-size: 14px; flex-shrink: 0; }
+
+.opportunity-box {
+  background: var(--risk-low-bg); border-radius: var(--radius-sm);
+  padding: 14px 16px; margin-top: 12px;
+  border-left: 4px solid var(--risk-low);
+}
+.opportunity-box h4 { font-size: 13px; font-weight: 700; color: var(--primary); margin-bottom: 6px; }
+.opportunity-box p { font-size: 13px; color: var(--text-sub); }
+
+/* ===================================================
+   データソースページ
+   =================================================== */
+.source-group { margin-bottom: 20px; }
+.source-group h3 {
+  font-size: 15px; font-weight: 700; color: var(--primary-dark);
+  margin-bottom: 10px; display: flex; align-items: center; gap: 6px;
+}
+.source-list { display: flex; flex-direction: column; gap: 8px; }
+.source-item {
+  background: var(--bg-card); border-radius: var(--radius-sm);
+  padding: 12px 16px; box-shadow: var(--shadow);
+  display: flex; align-items: flex-start; gap: 12px;
+}
+.source-item .source-name {
+  font-weight: 600; font-size: 14px; color: var(--primary);
+  text-decoration: none;
+}
+.source-item .source-name:hover { text-decoration: underline; }
+.source-item .source-desc { font-size: 12px; color: var(--text-sub); margin-top: 2px; }
+.source-icon { font-size: 20px; flex-shrink: 0; margin-top: 2px; }
+
+/* ===================================================
+   凡例
+   =================================================== */
+.legend-row {
+  display: flex; gap: 16px; flex-wrap: wrap;
+  margin-bottom: 12px; font-size: 12px;
+}
+.legend-item { display: flex; align-items: center; gap: 6px; }
+.legend-line { width: 24px; height: 3px; border-radius: 2px; }
+.legend-dashed { background: repeating-linear-gradient(90deg, #666 0px, #666 5px, transparent 5px, transparent 9px); height: 2px; }
+
+/* ===================================================
+   表
+   =================================================== */
+.data-table {
+  width: 100%; border-collapse: collapse; font-size: 13px;
+}
+.data-table th {
+  background: var(--bg); color: var(--text-sub);
+  padding: 8px 12px; text-align: right;
+  font-weight: 600; border-bottom: 2px solid var(--border);
+}
+.data-table th:first-child { text-align: left; }
+.data-table td {
+  padding: 8px 12px; border-bottom: 1px solid var(--border);
+  text-align: right;
+}
+.data-table td:first-child { text-align: left; font-weight: 600; }
+.data-table tr.forecast-row td { color: var(--text-sub); background: #FAFAF8; }
+
+/* ===================================================
+   注釈
+   =================================================== */
+.note {
+  font-size: 11px; color: var(--text-light);
+  margin-top: 8px; padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+/* ===================================================
+   レスポンシブ
+   =================================================== */
+@media (max-width: 768px) {
+  .navbar { padding: 0 12px; }
+  .page { padding: 16px 12px 40px; }
+  .charts-row { grid-template-columns: 1fr; }
+  .two-col { grid-template-columns: 1fr; }
+  .chart-container { height: 220px; }
+  .chart-full .chart-container { height: 260px; }
+  .metrics-grid { grid-template-columns: repeat(2, 1fr); }
+  .metric-value { font-size: 20px; }
+}
+
+@media (max-width: 480px) {
+  .metrics-grid { grid-template-columns: 1fr; }
+  .risk-table { font-size: 12px; }
+}
+
+/* ===================================================
+   アニメーション
+   =================================================== */
+.page { animation: fadeIn 0.2s ease; }
+@keyframes fadeIn { from { opacity: 0.6; } to { opacity: 1; } }
+
+/* ===================================================
+   スクロールバー
+   =================================================== */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: #BDBDBD; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #9E9E9E; }
+
+/* ===================================================
+   ナビゲーション - API状態エリア
+   =================================================== */
+.nav-api-area {
+  display: flex; align-items: center; gap: 6px;
+  margin-left: auto; padding: 6px 0;
+  white-space: nowrap;
+}
+.api-status-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+}
+.api-status-dot.connected    { background: #69F0AE; box-shadow: 0 0 6px #69F0AE; }
+.api-status-dot.disconnected { background: #9E9E9E; }
+.api-status-text { font-size: 11px; color: rgba(255,255,255,0.7); }
+.settings-btn { font-size: 12px !important; padding: 5px 10px !important; }
+
+/* ===================================================
+   データソース バッジ
+   =================================================== */
+.data-src-badge {
+  display: inline-block; font-size: 10px; font-weight: 600;
+  padding: 2px 7px; border-radius: 10px; margin-left: 6px;
+  vertical-align: middle;
+}
+.data-src-badge.live { background: #E8F5E9; color: #2E7D32; border: 1px solid #A5D6A7; }
+.data-src-badge.mock { background: #F5F5F5; color: #9E9E9E; border: 1px solid #E0E0E0; }
+
+/* ===================================================
+   モーダル
+   =================================================== */
+.modal-overlay {
+  position: fixed; inset: 0; z-index: 200;
+  background: rgba(0,0,0,0.5);
+  display: flex; align-items: center; justify-content: center;
+  padding: 16px;
+}
+.modal {
+  background: white; border-radius: var(--radius);
+  width: 100%; max-width: 560px;
+  max-height: 90vh; overflow-y: auto;
+  box-shadow: var(--shadow-md);
+  animation: fadeIn 0.15s ease;
+}
+.modal-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 18px 22px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.modal-header h2 { font-size: 17px; font-weight: 700; color: var(--primary-dark); }
+.modal-close {
+  background: none; border: none; font-size: 18px;
+  color: var(--text-sub); cursor: pointer; padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  line-height: 1;
+}
+.modal-close:hover { background: var(--bg); }
+.modal-body { padding: 18px 22px 22px; }
+
+/* フォーム */
+.form-row { margin-bottom: 14px; }
+.form-label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: var(--text); }
+.form-input-row { display: flex; gap: 6px; }
+.form-input {
+  flex: 1; padding: 8px 12px;
+  border: 1.5px solid var(--border); border-radius: var(--radius-sm);
+  font-size: 13px; font-family: inherit;
+  outline: none; transition: border-color 0.2s;
+}
+.form-input:focus { border-color: var(--primary-light); }
+.btn-icon {
+  padding: 8px 10px; border: 1.5px solid var(--border);
+  background: white; border-radius: var(--radius-sm);
+  cursor: pointer; font-size: 15px;
+}
+.btn-icon:hover { background: var(--bg); }
+
+/* APIメッセージ */
+.api-message {
+  font-size: 13px; padding: 10px 12px; border-radius: var(--radius-sm);
+  margin-bottom: 14px;
+}
+.api-message.info    { background: #E3F2FD; color: #1565C0; }
+.api-message.success { background: var(--risk-low-bg); color: var(--risk-low); }
+.api-message.error   { background: var(--risk-high-bg); color: var(--risk-high); }
+
+/* データ取得状況リスト */
+.data-status-list {
+  background: var(--bg); border-radius: var(--radius-sm);
+  padding: 12px 14px; margin-bottom: 14px;
+}
+.data-status-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 5px 0; font-size: 12px;
+  border-bottom: 1px solid var(--border);
+}
+.data-status-item:last-child { border-bottom: none; }
+.status-icon { font-size: 13px; font-weight: 700; width: 16px; text-align: center; }
+.status-icon.ok { color: var(--risk-low); }
+.status-icon.ng { color: var(--text-light); }
+.status-name { flex: 1; color: var(--text); }
+.status-src  { font-size: 11px; color: var(--text-light); text-align: right; }
+
+/* モーダルボタン行 */
+.modal-actions {
+  display: flex; gap: 8px; justify-content: flex-end; margin-bottom: 10px;
+}
+.btn-primary {
+  padding: 8px 18px; background: var(--primary);
+  color: white; border: none; border-radius: var(--radius-sm);
+  font-size: 13px; font-weight: 600; cursor: pointer;
+  font-family: inherit; transition: background 0.2s;
+}
+.btn-primary:hover:not(:disabled) { background: var(--primary-dark); }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-secondary {
+  padding: 8px 18px; background: white;
+  color: var(--text-sub); border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 13px; cursor: pointer; font-family: inherit;
+}
+.btn-secondary:hover { background: var(--bg); }
+
+/* 取得手順 */
+.howto-list {
+  padding: 12px 0 4px 18px; font-size: 13px;
+  color: var(--text-sub); line-height: 2;
+}
+.howto-list a { color: var(--primary); }
+
+/* ===================================================
+   ローディングオーバーレイ
+   =================================================== */
+.loading-overlay {
+  position: fixed; inset: 0; z-index: 300;
+  background: rgba(0,0,0,0.4);
+  display: flex; align-items: center; justify-content: center;
+}
+.loading-box {
+  background: white; border-radius: var(--radius);
+  padding: 28px 36px; text-align: center;
+  box-shadow: var(--shadow-md); min-width: 220px;
+}
+.loading-box p { margin-top: 14px; font-size: 14px; color: var(--text-sub); }
+.loading-spinner {
+  width: 36px; height: 36px; margin: 0 auto;
+  border: 4px solid var(--border);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
