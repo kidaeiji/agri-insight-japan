@@ -24,10 +24,9 @@
         {{ p.label }}
       </button>
     </div>
-    <!-- API設定ボタン -->
     <div class="nav-api-area">
       <span :class="['api-status-dot', apiConnected ? 'connected' : 'disconnected']"></span>
-      <span class="api-status-text">{{ apiConnected ? 'e-Stat接続中' : 'サンプルデータ' }}</span>
+      <span class="api-status-text">{{ apiConnected ? 'e-Stat接続中' : '未接続' }}</span>
       <button class="nav-btn settings-btn" @click="showSettings = true">⚙ API設定</button>
     </div>
   </nav>
@@ -42,11 +41,10 @@
         <button class="modal-close" @click="showSettings = false">✕</button>
       </div>
       <div class="modal-body">
-
         <div class="alert-item info" style="margin-bottom:16px;">
           <p>
             <strong>e-Stat（政府統計の総合窓口）</strong>のAPIキーを登録すると、
-            農林水産省の公式統計（作物収穫量・農業就業人口等）を実データで表示します。<br>
+            農林水産省の公式統計（作物収穫量・農業就業人口・食料需給表等）を実データで表示します。<br>
             APIキーは
             <a href="https://www.e-stat.go.jp/api/" target="_blank" style="color:#1976D2;">
               e-Stat公式サイト ↗
@@ -55,7 +53,6 @@
           </p>
         </div>
 
-        <!-- APIキー入力 -->
         <div class="form-row">
           <label class="form-label">APIキー</label>
           <div class="form-input-row">
@@ -66,28 +63,25 @@
               placeholder="e-StatのAPIキーを入力（英数字）"
               @keyup.enter="saveAndConnect"
             />
-            <button class="btn-icon" @click="showApiKey = !showApiKey" title="表示/非表示">
+            <button class="btn-icon" @click="showApiKey = !showApiKey">
               {{ showApiKey ? '🙈' : '👁' }}
             </button>
           </div>
         </div>
 
-        <!-- ステータス表示 -->
         <div v-if="apiMessage" :class="['api-message', apiMessageType]">
           {{ apiMessage }}
         </div>
 
-        <!-- データ取得状況 -->
         <div v-if="apiConnected" class="data-status-list">
           <h4 style="margin-bottom:8px; font-size:13px; color:#616161;">取得データの状況</h4>
           <div v-for="(status, key) in dataStatus" :key="key" class="data-status-item">
             <span :class="['status-icon', status.ok ? 'ok' : 'ng']">{{ status.ok ? '✓' : '✗' }}</span>
             <span class="status-name">{{ status.label }}</span>
-            <span class="status-src">{{ status.ok ? status.source : 'サンプルデータ使用中' }}</span>
+            <span class="status-src">{{ status.ok ? status.source : '未取得' }}</span>
           </div>
         </div>
 
-        <!-- ボタン行 -->
         <div class="modal-actions">
           <button class="btn-secondary" @click="clearApiKey">クリア</button>
           <button class="btn-primary" :disabled="!apiKeyInput || apiLoading" @click="saveAndConnect">
@@ -96,7 +90,6 @@
           </button>
         </div>
 
-        <!-- 取得手順 -->
         <details style="margin-top:16px;">
           <summary style="cursor:pointer; font-size:13px; color:#2E7D32; font-weight:600;">
             📋 APIキー取得手順（クリックして展開）
@@ -129,9 +122,16 @@
   <div v-show="currentPage === 'dashboard'" class="page">
     <div class="page-header">
       <h1>農作物需給ダッシュボード</h1>
-      <p class="subtitle">日本国内農作物の需要・供給状況と今後の見通し</p>
-      <span class="data-badge">実績: 2010-2024年</span>
-      <span class="forecast-badge">予測: 2025-2035年</span>
+      <p class="subtitle">日本国内農作物の需要・供給状況と農業従事者への示唆</p>
+    </div>
+
+    <!-- APIキー未設定バナー -->
+    <div v-if="!apiConnected" class="alert-item info" style="margin-bottom:20px;">
+      <p>
+        <strong>📡 e-Stat APIキーを設定すると実データをグラフで表示できます。</strong>
+        農林水産省の公式統計（収穫量・農業就業人口・食料需給表）をリアルタイムに取得します。
+        <button @click="showSettings=true" class="btn-link">API設定を開く →</button>
+      </p>
     </div>
 
     <!-- KPIカード -->
@@ -139,71 +139,67 @@
       <div class="metric-card danger">
         <div class="metric-top">
           <span class="metric-icon">🚨</span>
-          <span class="metric-value">2品目</span>
+          <span class="metric-value">{{ kpiSelfSuff }}</span>
         </div>
-        <div class="metric-label">高リスク作物</div>
-        <div class="metric-detail">小麦（自給率16%）・大豆（7%）</div>
+        <div class="metric-label">カロリーベース食料自給率</div>
+        <div class="metric-detail">{{ apiConnected ? '食料需給表（農林水産省）' : '先進国最低水準。輸入依存が深刻' }}</div>
       </div>
       <div class="metric-card warning">
         <div class="metric-top">
           <span class="metric-icon">👨‍🌾</span>
-          <span class="metric-value">-20%</span>
+          <span class="metric-value">{{ kpiWorkers }}</span>
         </div>
-        <div class="metric-label">2035年農業就業者予測</div>
-        <div class="metric-detail">168万人 → 134万人（2024→2035）</div>
+        <div class="metric-label">農業就業人口（最新）</div>
+        <div class="metric-detail">{{ apiConnected ? '農林業センサス（農林水産省）' : '高齢化・人口減少が加速中' }}</div>
       </div>
       <div class="metric-card info">
         <div class="metric-top">
           <span class="metric-icon">🏭</span>
-          <span class="metric-value">4万社</span>
+          <span class="metric-value">{{ kpiAgriBodies }}</span>
         </div>
-        <div class="metric-label">農業法人数（2030年予測）</div>
-        <div class="metric-detail">2024年比 +29%（3.1万→4万）</div>
+        <div class="metric-label">農業経営体数（最新）</div>
+        <div class="metric-detail">{{ apiConnected ? '農林業センサス（農林水産省）' : '法人経営への移行が進む' }}</div>
       </div>
       <div class="metric-card success">
         <div class="metric-top">
-          <span class="metric-icon">📊</span>
-          <span class="metric-value">38%</span>
+          <span class="metric-icon">🌾</span>
+          <span class="metric-value">{{ kpiRiceHarvest }}</span>
         </div>
-        <div class="metric-label">カロリーベース食料自給率</div>
-        <div class="metric-detail">先進国最低水準。輸入依存構造が深刻</div>
+        <div class="metric-label">米 収穫量（最新）</div>
+        <div class="metric-detail">{{ apiConnected ? '作物統計調査（農林水産省）' : '消費量減少・気候変動リスク' }}</div>
       </div>
     </div>
 
-    <!-- リスクマトリクス -->
+    <!-- 作物別リスク概観 -->
     <div class="section-card">
-      <h2>作物別 需給リスク評価マトリクス</h2>
-      <p class="section-desc">クリックすると作物詳細ページに移動します。リスクスコアの高い順に表示。</p>
+      <h2>作物別 需給リスク概観</h2>
+      <p class="section-desc">クリックすると作物詳細ページに移動します。自給率・担い手不足等の観点からリスクを評価。</p>
       <div class="risk-table-wrap">
         <table class="risk-table">
           <thead>
             <tr>
               <th>作物</th>
-              <th>現在の自給率</th>
-              <th>農家減少予測<br><small>(2024→2035)</small></th>
-              <th>価格上昇<br><small>(2010→2024)</small></th>
+              <th>自給率（概算）</th>
               <th>主な供給リスク</th>
+              <th>農業従事者への機会</th>
               <th>総合リスク</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="crop in riskMatrix" :key="crop.id" @click="goToCrop(crop.id)">
+            <tr v-for="crop in riskMatrix" :key="crop.id" @click="goToCrop(crop.id)" style="cursor:pointer;">
               <td class="crop-name">
                 <span class="crop-dot" :style="{background: crop.color}"></span>
                 {{ crop.name }}
               </td>
               <td :class="getRiskCellClass(crop.selfSufficiencyRisk)">
-                {{ crop.selfSufficiency }}%
-              </td>
-              <td :class="getRiskCellClass(crop.farmerRisk)">
-                {{ crop.farmerDecline }}
-              </td>
-              <td :class="getRiskCellClass(crop.priceRisk)">
-                {{ crop.priceChange }}
+                {{ crop.selfSufficiency[14] }}%
               </td>
               <td style="text-align:left; font-size:12px; color:#616161;">
                 {{ crop.riskFactors[0] }}
               </td>
+              <td style="text-align:left; font-size:12px; color:#388E3C;">
+                {{ crop.opportunity.slice(0, 40) }}{{ crop.opportunity.length > 40 ? '…' : '' }}
+              </td>
               <td>
                 <span :class="getRiskBadgeClass(crop.level)">{{ getRiskLabel(crop.level) }}</span>
               </td>
@@ -213,331 +209,272 @@
       </div>
     </div>
 
-    <!-- チャート行 -->
+    <!-- ダッシュボード チャート -->
     <div class="charts-row">
       <div class="chart-card">
-        <h3>農業就業者数の推移と予測（年齢層別）
+        <h3>農業就業人口の推移（年齢層別）
           <span :class="['data-src-badge', dataStatus.workers && dataStatus.workers.ok ? 'live' : 'mock']">
-            {{ dataStatus.workers && dataStatus.workers.ok ? '📡 e-Stat実データ' : '📋 サンプルデータ' }}
+            {{ dataStatus.workers && dataStatus.workers.ok ? '📡 e-Stat実データ' : '未接続' }}
           </span>
         </h3>
         <div class="chart-container">
+          <div v-if="!apiConnected" class="no-data-overlay">
+            <span class="no-data-icon">📊</span>
+            <p>e-Stat APIキーを設定すると<br>農林業センサスのデータを表示します</p>
+            <button @click="showSettings=true" class="btn-primary btn-sm">API設定</button>
+          </div>
           <canvas id="chart-workers-dash"></canvas>
         </div>
-        <p class="note">出典: 農林業センサス（農林水産省）。2026年以降は農研機構等の推計に基づく予測</p>
+        <p class="note">出典: 農林業センサス（農林水産省）</p>
       </div>
       <div class="chart-card">
         <h3>主要品目の食料自給率推移
-          <span class="data-src-badge mock">📋 サンプルデータ</span>
+          <span :class="['data-src-badge', dataStatus.foodBalance && dataStatus.foodBalance.ok ? 'live' : 'mock']">
+            {{ dataStatus.foodBalance && dataStatus.foodBalance.ok ? '📡 e-Stat実データ' : '未接続' }}
+          </span>
         </h3>
         <div class="chart-container">
+          <div v-if="!apiConnected" class="no-data-overlay">
+            <span class="no-data-icon">📊</span>
+            <p>e-Stat APIキーを設定すると<br>食料需給表のデータを表示します</p>
+            <button @click="showSettings=true" class="btn-primary btn-sm">API設定</button>
+          </div>
           <canvas id="chart-selfsuff-dash"></canvas>
         </div>
-        <p class="note">出典: 食料需給表（農林水産省）。2025年以降は推計値</p>
+        <p class="note">出典: 食料需給表（農林水産省）</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==============================
+       収穫量分析
+       ============================== -->
+  <div v-show="currentPage === 'harvest'" class="page">
+    <div class="page-header">
+      <h1>収穫量・作付面積分析</h1>
+      <p class="subtitle">作物統計調査・野菜生産出荷統計（農林水産省）の実データを年次で表示</p>
+    </div>
+
+    <!-- 作物セレクタ -->
+    <div class="crop-selector-wrap" style="margin-bottom:20px;">
+      <button v-for="crop in crops" :key="crop.id"
+              :class="['crop-btn', {active: selectedHarvestCrop === crop.id}]"
+              :style="{borderColor: crop.color, color: selectedHarvestCrop === crop.id ? 'white' : crop.color, background: selectedHarvestCrop === crop.id ? crop.color : 'white'}"
+              @click="selectedHarvestCrop = crop.id">
+        {{ crop.name }}
+      </button>
+    </div>
+
+    <div class="charts-row">
+      <div class="chart-card">
+        <h3>{{ harvestCrop.name }}の収穫量推移
+          <span :class="['data-src-badge', harvestDataOk ? 'live' : 'mock']">
+            {{ harvestDataOk ? '📡 e-Stat実データ' : '未接続' }}
+          </span>
+        </h3>
+        <div class="chart-container">
+          <div v-if="!harvestDataOk" class="no-data-overlay">
+            <span class="no-data-icon">📊</span>
+            <p>{{ apiConnected ? 'このデータは取得できませんでした' : 'e-Stat APIキーを設定すると表示できます' }}</p>
+            <button v-if="!apiConnected" @click="showSettings=true" class="btn-primary btn-sm">API設定</button>
+          </div>
+          <canvas id="chart-harvest"></canvas>
+        </div>
+        <p class="note">出典: {{ harvestDataSource }}</p>
+      </div>
+      <div class="chart-card">
+        <h3>{{ harvestCrop.name }}の作付面積推移
+          <span :class="['data-src-badge', areaDataOk ? 'live' : 'mock']">
+            {{ areaDataOk ? '📡 e-Stat実データ' : '未接続' }}
+          </span>
+        </h3>
+        <div class="chart-container">
+          <div v-if="!areaDataOk" class="no-data-overlay">
+            <span class="no-data-icon">📊</span>
+            <p>{{ apiConnected ? 'このデータは取得できませんでした' : 'e-Stat APIキーを設定すると表示できます' }}</p>
+            <button v-if="!apiConnected" @click="showSettings=true" class="btn-primary btn-sm">API設定</button>
+          </div>
+          <canvas id="chart-area"></canvas>
+        </div>
+        <p class="note">出典: {{ areaDataSource }}</p>
       </div>
     </div>
 
-    <!-- 今後の注目ポイント -->
+    <!-- 全作物収穫量比較 -->
     <div class="section-card">
-      <h2>農業従事者が注目すべき需給変化</h2>
+      <h2>全作物 収穫量（最新年）比較</h2>
+      <div class="chart-container" style="height:280px;">
+        <div v-if="!apiConnected" class="no-data-overlay">
+          <span class="no-data-icon">📊</span>
+          <p>e-Stat APIキーを設定すると表示できます</p>
+          <button @click="showSettings=true" class="btn-primary btn-sm">API設定</button>
+        </div>
+        <canvas id="chart-harvest-all"></canvas>
+      </div>
+      <p class="note">各作物の直近年の収穫量。単位は万トン（小数第1位まで）</p>
+    </div>
+  </div>
+
+  <!-- ==============================
+       農業就業者
+       ============================== -->
+  <div v-show="currentPage === 'workers'" class="page">
+    <div class="page-header">
+      <h1>農業就業者・農業経営体</h1>
+      <p class="subtitle">農林業センサス（農林水産省）の実データより、農業担い手の動向を分析</p>
+    </div>
+
+    <div class="charts-row">
+      <div class="chart-card">
+        <h3>農業就業人口の推移（年齢層別）
+          <span :class="['data-src-badge', dataStatus.workers && dataStatus.workers.ok ? 'live' : 'mock']">
+            {{ dataStatus.workers && dataStatus.workers.ok ? '📡 e-Stat実データ' : '未接続' }}
+          </span>
+        </h3>
+        <div class="chart-container">
+          <div v-if="!apiConnected" class="no-data-overlay">
+            <span class="no-data-icon">📊</span>
+            <p>e-Stat APIキーを設定すると表示できます</p>
+            <button @click="showSettings=true" class="btn-primary btn-sm">API設定</button>
+          </div>
+          <canvas id="chart-workers-age"></canvas>
+        </div>
+        <p class="note">出典: 農林業センサス（農林水産省）。5年ごとの調査データを線形補間</p>
+      </div>
+      <div class="chart-card">
+        <h3>農業経営体数の推移
+          <span :class="['data-src-badge', dataStatus.agriBodies && dataStatus.agriBodies.ok ? 'live' : 'mock']">
+            {{ dataStatus.agriBodies && dataStatus.agriBodies.ok ? '📡 e-Stat実データ' : '未接続' }}
+          </span>
+        </h3>
+        <div class="chart-container">
+          <div v-if="!apiConnected" class="no-data-overlay">
+            <span class="no-data-icon">📊</span>
+            <p>e-Stat APIキーを設定すると表示できます</p>
+            <button @click="showSettings=true" class="btn-primary btn-sm">API設定</button>
+          </div>
+          <canvas id="chart-agri-bodies"></canvas>
+        </div>
+        <p class="note">出典: 農林業センサス（農林水産省）。農業経営体とは農業を行う個人・法人の総数</p>
+      </div>
+    </div>
+
+    <!-- 農業の担い手に関するポイント -->
+    <div class="section-card">
+      <h2>農業の担い手に関するポイント</h2>
       <div class="alerts-grid">
         <div class="alert-item high">
-          <div class="alert-header">🔴 高リスク — 輸入依存</div>
-          <h4>小麦・大豆の供給途絶リスク</h4>
-          <p>小麦の自給率は約16%、大豆は約7%。ウクライナ紛争・米中対立・気候変動により国際価格が高騰。国産化・代替作物への転換が農業者の収益機会になりうる。</p>
-        </div>
-        <div class="alert-item high">
-          <div class="alert-header">🔴 高リスク — 担い手不足</div>
-          <h4>急速な農業就業者の高齢化・減少</h4>
-          <p>農業就業者の平均年齢は67歳超。2035年には現在の80%まで減少予測。作物によっては生産量が急激に落ち込む可能性。新規参入者や農業法人にとって大きなチャンス。</p>
+          <div class="alert-header">🔴 高齢化の加速</div>
+          <h4>農業就業者の平均年齢は67歳超</h4>
+          <p>2020年農林業センサスでは就業者の約7割が65歳以上。10年以内の大量離農が見込まれ、農地・生産基盤の維持が課題。</p>
         </div>
         <div class="alert-item medium">
-          <div class="alert-header">🟡 中リスク — 気候変動</div>
-          <h4>産地集中作物の大規模不作リスク</h4>
-          <p>タマネギ（北海道80%以上）・じゃがいも（北海道80%）・りんご（青森・長野）など産地集中作物は、気候変動による大規模不作リスクが増大。分散生産・品種転換が急務。</p>
+          <div class="alert-header">🟡 新規就農者の動向</div>
+          <h4>年間4〜5万人が新規就農</h4>
+          <p>農業次世代人材投資資金等の支援制度により、49歳以下の新規就農者は年4〜5万人水準を維持。ただし離農に追いつかない。</p>
+        </div>
+        <div class="alert-item low">
+          <div class="alert-header">🟢 法人経営の拡大</div>
+          <h4>農業法人数は2010年代以降増加</h4>
+          <p>農業法人への集積が進み、1法人あたりの耕作面積拡大で生産効率が向上。高齢農家からの農地集積が加速中。</p>
         </div>
         <div class="alert-item info">
-          <div class="alert-header">🟦 機会 — 大規模化</div>
-          <h4>農業法人・スマート農業の拡大余地</h4>
-          <p>農業法人数は2030年まで年率5%増が見込まれる。ドローン防除・AI栽培管理・施設園芸の導入で生産性は大幅向上。高齢農家からの農地集積も加速中。</p>
+          <div class="alert-header">🟦 スマート農業</div>
+          <h4>ICT・ロボットで少人数化を補完</h4>
+          <p>ドローン防除・AI生育管理・自動化農機の普及で、就業者数減少を生産性向上で補う取り組みが広がっている。</p>
         </div>
       </div>
     </div>
   </div>
 
   <!-- ==============================
-       需要分析
+       食料需給表
        ============================== -->
-  <div v-show="currentPage === 'demand'" class="page">
+  <div v-show="currentPage === 'foodbalance'" class="page">
     <div class="page-header">
-      <h1>需要分析</h1>
-      <p class="subtitle">消費量・人口動態・価格・食のトレンドから将来の需要を予測</p>
+      <h1>食料需給表</h1>
+      <p class="subtitle">農林水産省「食料需給表」より、品目別の国内生産・消費・輸入・自給率を表示</p>
     </div>
 
-    <!-- 人口・価格指数 -->
+    <!-- 作物セレクタ -->
+    <div class="crop-selector-wrap" style="margin-bottom:20px;">
+      <button v-for="crop in crops" :key="crop.id"
+              :class="['crop-btn', {active: selectedFBCrop === crop.id}]"
+              :style="{borderColor: crop.color, color: selectedFBCrop === crop.id ? 'white' : crop.color, background: selectedFBCrop === crop.id ? crop.color : 'white'}"
+              @click="selectedFBCrop = crop.id">
+        {{ crop.name }}
+      </button>
+    </div>
+
     <div class="two-col">
       <div class="chart-card">
-        <h3>日本の人口構造の推移と予測</h3>
-        <div class="chart-container">
-          <canvas id="chart-population"></canvas>
-        </div>
-        <p class="note">出典: 国立社会保障・人口問題研究所「日本の将来推計人口（2023年推計）」</p>
-      </div>
-      <div class="chart-card">
-        <h3>主要農産物の小売価格指数推移（2010年=100）</h3>
-        <div class="chart-container">
-          <canvas id="chart-price-index"></canvas>
-        </div>
-        <p class="note">出典: 農畜産業振興機構・総務省家計調査をもとに作成。2025年以降は予測値</p>
-      </div>
-    </div>
-
-    <!-- 作物別消費量 -->
-    <div class="section-card">
-      <h2>作物別 消費量・価格推移</h2>
-      <p class="section-desc">作物を選択すると消費量と小売価格の推移を表示します</p>
-      <div class="crop-selector-wrap">
-        <button v-for="crop in crops" :key="crop.id"
-                :class="['crop-btn', {active: selectedDemandCrop === crop.id}]"
-                :style="{borderColor: crop.color, color: selectedDemandCrop === crop.id ? 'white' : crop.color, background: selectedDemandCrop === crop.id ? crop.color : 'white'}"
-                @click="selectedDemandCrop = crop.id">
-          {{ crop.name }}
-        </button>
-      </div>
-      <div class="charts-row">
-        <div class="chart-card">
-          <h3>{{ demandCrop.name }}の消費量推移・予測
-            <span class="data-src-badge mock">📋 サンプルデータ</span>
-          </h3>
-          <div class="chart-container">
-            <canvas id="chart-demand-crop"></canvas>
-          </div>
-        </div>
-        <div class="chart-card">
-          <h3>{{ demandCrop.name }}の小売価格推移・予測
-            <span class="data-src-badge mock">📋 サンプルデータ</span>
-          </h3>
-          <div class="chart-container">
-            <canvas id="chart-demand-price"></canvas>
-          </div>
-        </div>
-      </div>
-      <p class="note">実線: 実績値（農林水産省統計）／破線: 予測値（農研機構・農経研等の推計モデルをもとに作成）</p>
-    </div>
-
-    <!-- 食のトレンド -->
-    <div class="section-card">
-      <h2>食のトレンドと農業への影響</h2>
-      <p class="section-desc">国内外の食トレンドが農産物の需要に与える影響を分析</p>
-      <div v-for="group in foodTrends" :key="group.category" style="margin-bottom:20px;">
-        <h3 style="margin-bottom:12px; font-size:15px; color:#2E7D32;">
-          {{ group.icon }} {{ group.category }}
+        <h3>国内生産量
+          <span :class="['data-src-badge', fbDataOk ? 'live' : 'mock']">
+            {{ fbDataOk ? '📡 e-Stat実データ' : '未接続' }}
+          </span>
         </h3>
-        <div class="trend-cards">
-          <div v-for="item in group.items" :key="item.title" class="trend-card">
-            <div class="trend-card-header">
-              <div>
-                <div class="trend-card-title">{{ item.title }}</div>
-              </div>
-            </div>
-            <p>{{ item.desc }}</p>
-            <span :class="impactClass(item.impact)">需要影響度: {{ item.impact }}</span>
+        <div class="chart-container">
+          <div v-if="!fbDataOk" class="no-data-overlay">
+            <span class="no-data-icon">📊</span>
+            <p>{{ apiConnected ? 'このデータは取得できませんでした' : 'e-Stat APIキーを設定すると表示できます' }}</p>
+            <button v-if="!apiConnected" @click="showSettings=true" class="btn-primary btn-sm">API設定</button>
           </div>
+          <canvas id="chart-fb-prod"></canvas>
+        </div>
+      </div>
+      <div class="chart-card">
+        <h3>国内消費仕向量
+          <span :class="['data-src-badge', fbDataOk ? 'live' : 'mock']">
+            {{ fbDataOk ? '📡 e-Stat実データ' : '未接続' }}
+          </span>
+        </h3>
+        <div class="chart-container">
+          <div v-if="!fbDataOk" class="no-data-overlay">
+            <span class="no-data-icon">📊</span>
+            <p>{{ apiConnected ? 'このデータは取得できませんでした' : 'e-Stat APIキーを設定すると表示できます' }}</p>
+            <button v-if="!apiConnected" @click="showSettings=true" class="btn-primary btn-sm">API設定</button>
+          </div>
+          <canvas id="chart-fb-cons"></canvas>
         </div>
       </div>
     </div>
-  </div>
 
-  <!-- ==============================
-       供給分析
-       ============================== -->
-  <div v-show="currentPage === 'supply'" class="page">
-    <div class="page-header">
-      <h1>供給分析</h1>
-      <p class="subtitle">生産量・輸入量・農業従事者・法人化・生産性向上から将来の供給力を分析</p>
-    </div>
-
-    <!-- 農業法人・生産性 -->
     <div class="two-col">
       <div class="chart-card">
-        <h3>農業法人数の推移と予測</h3>
+        <h3>輸入量
+          <span :class="['data-src-badge', fbDataOk ? 'live' : 'mock']">
+            {{ fbDataOk ? '📡 e-Stat実データ' : '未接続' }}
+          </span>
+        </h3>
         <div class="chart-container">
-          <canvas id="chart-corporations"></canvas>
+          <div v-if="!fbDataOk" class="no-data-overlay">
+            <span class="no-data-icon">📊</span>
+            <p>{{ apiConnected ? 'このデータは取得できませんでした' : 'e-Stat APIキーを設定すると表示できます' }}</p>
+            <button v-if="!apiConnected" @click="showSettings=true" class="btn-primary btn-sm">API設定</button>
+          </div>
+          <canvas id="chart-fb-imp"></canvas>
         </div>
-        <p class="note">出典: 農林水産省「農業法人に関する実態調査」。薄色は予測値</p>
       </div>
       <div class="chart-card">
-        <h3>農業生産性指数の推移と予測（2010年=100）</h3>
+        <h3>食料自給率（重量ベース）
+          <span :class="['data-src-badge', fbDataOk ? 'live' : 'mock']">
+            {{ fbDataOk ? '📡 e-Stat実データ' : '未接続' }}
+          </span>
+        </h3>
         <div class="chart-container">
-          <canvas id="chart-productivity"></canvas>
-        </div>
-        <p class="note">総合生産性は農業総産出量÷農業就業者数ベース。ICTはスマート農業導入農家の試算</p>
-      </div>
-    </div>
-
-    <!-- 生産性向上のポイント -->
-    <div class="section-card">
-      <h2>生産性向上の主要因と農業従事者への示唆</h2>
-      <div class="alerts-grid">
-        <div class="alert-item low">
-          <div class="alert-header">🚜 機械化・大規模化</div>
-          <h4>農業法人・集落営農による規模拡大</h4>
-          <p>10ha超の大規模経営では小規模農家比2-3倍の労働生産性。高齢農家からの農地集積加速により2030年にかけて大規模化が進む見込み。</p>
-        </div>
-        <div class="alert-item low">
-          <div class="alert-header">🤖 スマート農業</div>
-          <h4>ドローン・AIによる精密農業</h4>
-          <p>ドローン防除で農薬散布コスト50%削減、AI生育管理で収量15%向上の事例あり。導入農家数は年率20%増で拡大中。初期投資回収年数は3-5年。</p>
-        </div>
-        <div class="alert-item low">
-          <div class="alert-header">🌱 施設園芸・植物工場</div>
-          <h4>気象に左右されない安定生産</h4>
-          <p>施設トマト・葉物野菜は露地比3-5倍の収量。気候変動リスク対策として有効。エネルギーコスト管理が収益性の鍵。</p>
-        </div>
-        <div class="alert-item info">
-          <div class="alert-header">🌍 輸入安定化対策</div>
-          <h4>輸入先分散と国内代替生産</h4>
-          <p>大豆・小麦の輸入依存緩和のため、国内生産拡大が政策課題。転作奨励補助金の活用で国産大豆・小麦農家の収益性が改善しつつある。</p>
-        </div>
-      </div>
-    </div>
-
-    <!-- 作物別供給チャート -->
-    <div class="section-card">
-      <h2>作物別 生産量・輸入量・農業従事者数推移</h2>
-      <p class="section-desc">作物を選択して詳細を確認</p>
-      <div class="crop-selector-wrap">
-        <button v-for="crop in crops" :key="crop.id"
-                :class="['crop-btn', {active: selectedSupplyCrop === crop.id}]"
-                :style="{borderColor: crop.color, color: selectedSupplyCrop === crop.id ? 'white' : crop.color, background: selectedSupplyCrop === crop.id ? crop.color : 'white'}"
-                @click="selectedSupplyCrop = crop.id">
-          {{ crop.name }}
-        </button>
-      </div>
-      <div class="charts-row">
-        <div class="chart-card">
-          <h3>{{ supplyCrop.name }}の生産量・輸入量推移
-            <span :class="['data-src-badge', dataStatus[selectedSupplyCrop] && dataStatus[selectedSupplyCrop].ok ? 'live' : 'mock']">
-              {{ dataStatus[selectedSupplyCrop] && dataStatus[selectedSupplyCrop].ok ? '📡 e-Stat実データ' : '📋 サンプルデータ' }}
-            </span>
-          </h3>
-          <div class="chart-container">
-            <canvas id="chart-supply-crop"></canvas>
+          <div v-if="!fbDataOk" class="no-data-overlay">
+            <span class="no-data-icon">📊</span>
+            <p>{{ apiConnected ? 'このデータは取得できませんでした' : 'e-Stat APIキーを設定すると表示できます' }}</p>
+            <button v-if="!apiConnected" @click="showSettings=true" class="btn-primary btn-sm">API設定</button>
           </div>
-        </div>
-        <div class="chart-card">
-          <h3>{{ supplyCrop.name }}の農業従事者数推移
-            <span :class="['data-src-badge', dataStatus.workers && dataStatus.workers.ok ? 'live' : 'mock']">
-              {{ dataStatus.workers && dataStatus.workers.ok ? '📡 e-Stat実データ' : '📋 サンプルデータ' }}
-            </span>
-          </h3>
-          <div class="chart-container">
-            <canvas id="chart-supply-farmers"></canvas>
-          </div>
-        </div>
-      </div>
-      <p class="note">実線: 実績値／破線: 予測値。輸入量は財務省貿易統計より。農業従事者数は農林業センサスより</p>
-    </div>
-  </div>
-
-  <!-- ==============================
-       需給ギャップ分析
-       ============================== -->
-  <div v-show="currentPage === 'gap'" class="page">
-    <div class="page-header">
-      <h1>需給ギャップ分析</h1>
-      <p class="subtitle">各作物の需要と供給の差（ギャップ）から将来の不足・過剰を予測</p>
-    </div>
-
-    <!-- 作物別リスクカード -->
-    <div class="gap-summary-cards">
-      <div v-for="crop in crops" :key="crop.id"
-           :class="gapCardClass(crop)"
-           @click="setGapCrop(crop.id)">
-        <div class="crop-label">{{ crop.name }}</div>
-        <div class="ss-value" :style="{color: crop.color}">
-          {{ crop.selfSufficiency[14] }}<span class="ss-unit">%</span>
-        </div>
-        <div class="ss-unit">自給率（2024年）</div>
-        <div class="risk-label">{{ gapRiskLabel(crop) }}</div>
-      </div>
-    </div>
-
-    <!-- 需給バランスチャート -->
-    <div class="section-card">
-      <h2>需給バランス詳細分析</h2>
-      <p class="section-desc">下のカードまたはボタンで作物を切り替えて需給推移を確認</p>
-      <div class="crop-selector-wrap">
-        <button v-for="crop in crops" :key="crop.id"
-                :class="['crop-btn', {active: selectedGapCrop === crop.id}]"
-                :style="{borderColor: crop.color, color: selectedGapCrop === crop.id ? 'white' : crop.color, background: selectedGapCrop === crop.id ? crop.color : 'white'}"
-                @click="selectedGapCrop = crop.id">
-          {{ crop.name }}
-        </button>
-      </div>
-
-      <div class="charts-row">
-        <div class="chart-card chart-full">
-          <h3>{{ gapCrop.name }}の需給バランス推移（供給量 vs 需要量）</h3>
-          <div class="chart-container" style="height:300px;">
-            <canvas id="chart-gap-main"></canvas>
-          </div>
-        </div>
-      </div>
-      <div class="charts-row">
-        <div class="chart-card">
-          <h3>{{ gapCrop.name }}の需給ギャップ（供給－需要）</h3>
-          <div class="chart-container">
-            <canvas id="chart-gap-bar"></canvas>
-          </div>
-          <p class="note">プラス: 供給過剰（価格低下要因）／マイナス: 供給不足（価格上昇・不足リスク）</p>
-        </div>
-        <div class="chart-card">
-          <h3>{{ gapCrop.name }}のリスク要因</h3>
-          <div style="padding: 8px 0;">
-            <ul class="risk-factor-list">
-              <li v-for="factor in gapCrop.riskFactors" :key="factor">{{ factor }}</li>
-            </ul>
-            <div class="opportunity-box" style="margin-top:16px;">
-              <h4>🌱 農業従事者への機会</h4>
-              <p>{{ gapCrop.opportunity }}</p>
-            </div>
-          </div>
+          <canvas id="chart-fb-ss"></canvas>
         </div>
       </div>
     </div>
 
-    <!-- 総合見通し -->
-    <div class="section-card">
-      <h2>2035年に向けた需給見通しサマリー</h2>
-      <div style="overflow-x:auto;">
-        <table class="data-table" style="min-width:600px;">
-          <thead>
-            <tr>
-              <th>作物</th>
-              <th>2024年自給率</th>
-              <th>2035年自給率予測</th>
-              <th>2035年農家数予測</th>
-              <th>価格変動予測</th>
-              <th>総合評価</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="crop in riskMatrix" :key="crop.id">
-              <td>{{ crop.name }}</td>
-              <td>{{ crop.selfSufficiency[14] }}%</td>
-              <td>{{ crop.selfSufficiency[25] }}%</td>
-              <td>{{ crop.farmers[25].toFixed(1) }}万人</td>
-              <td>{{ crop.retailPrice[25] }}円/kg</td>
-              <td>
-                <span :class="getRiskBadgeClass(crop.level)">{{ getRiskLabel(crop.level) }}</span>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <p class="note">2035年の値はすべて予測値。農林水産省・農研機構・国立社会保障・人口問題研究所のデータに基づき推計</p>
-    </div>
+    <p class="note" style="margin-top:4px;">
+      出典: 食料需給表（農林水産省）。データは確報値。最新年は速報の場合あり。
+    </p>
   </div>
 
   <!-- ==============================
@@ -546,7 +483,7 @@
   <div v-show="currentPage === 'detail'" class="page">
     <div class="page-header">
       <h1>作物別詳細分析</h1>
-      <p class="subtitle">選択した作物の需要・供給・価格・リスク要因を総合的に分析</p>
+      <p class="subtitle">収穫量・食料需給表を合わせて作物ごとの動向を詳しく分析</p>
     </div>
 
     <!-- 作物選択 -->
@@ -559,7 +496,7 @@
       </button>
     </div>
 
-    <!-- サマリー指標 -->
+    <!-- 作物サマリー -->
     <div class="section-card" style="margin-bottom:16px;">
       <div class="detail-header">
         <div class="detail-crop-icon" :style="{background: detailCrop.color + '22', border: '2px solid ' + detailCrop.color}">
@@ -574,20 +511,20 @@
       </div>
       <div class="info-row">
         <div class="info-box">
-          <div class="val">{{ detailCurrentData.selfSufficiency }}%</div>
-          <div class="lbl">食料自給率（2024）</div>
+          <div class="val">{{ detailLatestHarvest }}</div>
+          <div class="lbl">最新収穫量（万t）</div>
         </div>
         <div class="info-box">
-          <div class="val">{{ detailCurrentData.farmerCount.toFixed(1) }}万人</div>
-          <div class="lbl">農業従事者数（2024）</div>
+          <div class="val">{{ detailLatestSS }}</div>
+          <div class="lbl">食料自給率（%）</div>
         </div>
         <div class="info-box">
-          <div class="val">{{ detailCurrentData.retailPrice }}円</div>
-          <div class="lbl">小売価格/kg（2024）</div>
+          <div class="val">{{ detailLatestProd }}</div>
+          <div class="lbl">国内生産量（万t）</div>
         </div>
         <div class="info-box">
-          <div class="val">{{ detailCurrentData.supply.toFixed(0) }}万t</div>
-          <div class="lbl">総供給量（2024）</div>
+          <div class="val">{{ detailLatestImports }}</div>
+          <div class="lbl">輸入量（万t）</div>
         </div>
       </div>
       <ul class="risk-factor-list">
@@ -599,39 +536,58 @@
       </div>
     </div>
 
-    <!-- 詳細チャート -->
+    <!-- 収穫量チャート -->
+    <div class="chart-card chart-full" style="margin-bottom:16px;">
+      <h3>{{ detailCrop.name }}の収穫量推移
+        <span :class="['data-src-badge', detailHarvestOk ? 'live' : 'mock']">
+          {{ detailHarvestOk ? '📡 e-Stat実データ' : '未接続' }}
+        </span>
+      </h3>
+      <div class="chart-container" style="height:260px;">
+        <div v-if="!detailHarvestOk" class="no-data-overlay">
+          <span class="no-data-icon">📊</span>
+          <p>{{ apiConnected ? 'このデータは取得できませんでした' : 'e-Stat APIキーを設定すると表示できます' }}</p>
+          <button v-if="!apiConnected" @click="showSettings=true" class="btn-primary btn-sm">API設定</button>
+        </div>
+        <canvas id="chart-detail-harvest"></canvas>
+      </div>
+      <p class="note">出典: {{ detailHarvestSource }}</p>
+    </div>
+
+    <!-- 食料需給表チャート -->
     <div class="charts-row">
-      <div class="chart-card chart-full">
-        <h3>{{ detailCrop.name }}の需給推移・予測（生産量・輸入量・消費量）
-          <span :class="['data-src-badge', dataStatus[selectedCrop] && dataStatus[selectedCrop].ok ? 'live' : 'mock']">
-            {{ dataStatus[selectedCrop] && dataStatus[selectedCrop].ok ? '📡 e-Stat実データ' : '📋 サンプルデータ' }}
+      <div class="chart-card">
+        <h3>生産量・消費量・輸入量（食料需給表）
+          <span :class="['data-src-badge', detailFBOk ? 'live' : 'mock']">
+            {{ detailFBOk ? '📡 e-Stat実データ' : '未接続' }}
           </span>
         </h3>
-        <div class="chart-container" style="height:300px;">
-          <canvas id="chart-detail-main"></canvas>
-        </div>
-      </div>
-    </div>
-    <div class="charts-row">
-      <div class="chart-card">
-        <h3>小売価格の推移・予測</h3>
         <div class="chart-container">
-          <canvas id="chart-detail-price"></canvas>
+          <div v-if="!detailFBOk" class="no-data-overlay">
+            <span class="no-data-icon">📊</span>
+            <p>{{ apiConnected ? 'このデータは取得できませんでした' : 'e-Stat APIキーを設定すると表示できます' }}</p>
+            <button v-if="!apiConnected" @click="showSettings=true" class="btn-primary btn-sm">API設定</button>
+          </div>
+          <canvas id="chart-detail-fb"></canvas>
         </div>
+        <p class="note">出典: 食料需給表（農林水産省）</p>
       </div>
       <div class="chart-card">
-        <h3>農業従事者数の推移・予測</h3>
+        <h3>食料自給率の推移（食料需給表）
+          <span :class="['data-src-badge', detailFBOk ? 'live' : 'mock']">
+            {{ detailFBOk ? '📡 e-Stat実データ' : '未接続' }}
+          </span>
+        </h3>
         <div class="chart-container">
-          <canvas id="chart-detail-farmers"></canvas>
+          <div v-if="!detailFBOk" class="no-data-overlay">
+            <span class="no-data-icon">📊</span>
+            <p>{{ apiConnected ? 'このデータは取得できませんでした' : 'e-Stat APIキーを設定すると表示できます' }}</p>
+            <button v-if="!apiConnected" @click="showSettings=true" class="btn-primary btn-sm">API設定</button>
+          </div>
+          <canvas id="chart-detail-ss"></canvas>
         </div>
+        <p class="note">出典: 食料需給表（農林水産省）</p>
       </div>
-    </div>
-    <div class="chart-card chart-full" style="margin-bottom:20px; padding:18px 20px;">
-      <h3>食料自給率の推移・予測</h3>
-      <div class="chart-container" style="height:240px;">
-        <canvas id="chart-detail-ss"></canvas>
-      </div>
-      <p class="note">実線: 実績値（農林水産省食料需給表）／破線: 予測値。2025年以降の予測は政策動向・生産トレンドをもとに推計</p>
     </div>
   </div>
 
@@ -647,12 +603,29 @@
     <div class="section-card" style="margin-bottom:16px;">
       <h2>免責事項・データについて</h2>
       <div class="alert-item medium" style="margin-top:8px;">
-        <p>本アプリケーションに表示されるデータは、農林水産省・総務省・財務省等の公開統計をもとに作成したサンプルデータです。<strong>2025年以降の予測値はモデルによる推計であり、実際の将来値を保証するものではありません。</strong>農業経営の意思決定には、最新の公式統計・専門機関の情報を必ずご確認ください。</p>
+        <p>
+          本アプリケーションに表示されるデータは、e-Stat（政府統計の総合窓口）経由で農林水産省の公式統計を取得して表示します。
+          <strong>取得データは確報値ですが、最新年については速報値の場合があります。</strong>
+          農業経営の意思決定には、最新の公式統計・専門機関の情報を必ずご確認ください。
+        </p>
+      </div>
+    </div>
+
+    <div class="section-card" style="margin-bottom:16px;">
+      <h2>本アプリで取得するe-Statデータ</h2>
+      <div class="source-list">
+        <div v-for="item in estatDataSources" :key="item.name" class="source-item">
+          <span class="source-icon">📊</span>
+          <div>
+            <div class="source-name">{{ item.name }}</div>
+            <div class="source-desc">{{ item.desc }}</div>
+          </div>
+        </div>
       </div>
     </div>
 
     <div class="section-card">
-      <h2>公式データソース一覧</h2>
+      <h2>公式データソース・関連機関</h2>
       <div v-for="group in dataSources" :key="group.category" class="source-group">
         <h3>📂 {{ group.category }}</h3>
         <div class="source-list">
