@@ -161,18 +161,13 @@ createApp({
       await this.connectEstat(this.apiKeyInput, true);
     },
 
-    // APIキークリア
+    // APIキークリア（ページリロードでサンプルデータに戻す）
     clearApiKey() {
       localStorage.removeItem('estat_api_key');
       this.apiKeyInput = '';
-      this.apiConnected = false;
-      this.apiMessage = 'APIキーをクリアしました。サンプルデータを使用します。';
+      this.apiMessage = 'クリアしました。サンプルデータに戻すためページを再読み込みします...';
       this.apiMessageType = 'info';
-      // データをサンプルに戻す
-      Object.keys(this.dataStatus).forEach(k => {
-        this.dataStatus[k].ok = false;
-        this.dataStatus[k].source = '';
-      });
+      setTimeout(() => location.reload(), 1200);
     },
 
     // e-Statへ接続してデータ取得
@@ -208,37 +203,52 @@ createApp({
       }
     },
 
-    // e-Statデータを CROPS データ構造にマージ（実績部分のみ上書き）
+    // e-Statデータを CROPS データ構造にマージ（実績部分 2010-2024 のみ上書き）
     mergeEstatData(result) {
       const cropKeys = ['rice', 'wheat', 'soybean', 'tomato', 'onion', 'cabbage', 'potato'];
 
       cropKeys.forEach(key => {
         const fetched = result[key];
-        if (!fetched || !fetched.data) return;
+        if (!fetched?.data) return;
 
-        // null でない実績値のみを CROPS.production に反映
+        let updated = 0;
         fetched.data.forEach((val, i) => {
-          if (val !== null && i <= FORECAST_START_IDX) {
+          // FORECAST_START_IDX 以前（実績期間）かつ有効値のみ反映
+          if (val !== null && val > 0 && i <= FORECAST_START_IDX) {
             CROPS[key].production[i] = val;
+            updated++;
           }
         });
 
-        this.dataStatus[key].ok = true;
-        this.dataStatus[key].source = fetched.source;
+        if (updated > 0) {
+          this.dataStatus[key].ok = true;
+          this.dataStatus[key].source = `${fetched.source}（${updated}年分）`;
+        }
       });
 
-      // 農業就業人口は AGRI_WORKERS.total へ反映
+      // 農業就業人口: year→value マップ経由で AGRI_WORKERS に反映
       if (result.workers?.data) {
+        const yearMap = {};
         result.workers.data.forEach((val, i) => {
-          const year = ALL_YEARS[i];
-          const idx = AGRI_WORKERS.years.indexOf(year);
-          if (idx !== -1 && val !== null) {
-            AGRI_WORKERS.total[idx] = val;
+          if (val !== null && val > 0) yearMap[ALL_YEARS[i]] = val;
+        });
+
+        let updated = 0;
+        AGRI_WORKERS.years.forEach((year, idx) => {
+          if (yearMap[year] !== undefined && year <= 2024) {
+            AGRI_WORKERS.total[idx] = yearMap[year];
+            updated++;
           }
         });
-        this.dataStatus.workers.ok = true;
-        this.dataStatus.workers.source = result.workers.source;
+
+        if (updated > 0) {
+          this.dataStatus.workers.ok = true;
+          this.dataStatus.workers.source = `${result.workers.source}（${updated}時点分）`;
+        }
       }
+
+      // dataStatus を Vue に確実に反映させるため再代入
+      this.dataStatus = { ...this.dataStatus };
     },
 
     // ===================================================
