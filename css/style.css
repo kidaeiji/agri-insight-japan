@@ -614,3 +614,51 @@ body {
 .data-src-badge:not(.live):not(.mock) {
   background: #FFF3E0; color: #E65100; border: 1px solid #FFCC80;
 }
+
+/* ===================================================
+   未接続バナー
+   =================================================== */
+.connect-banner {
+  display: flex; align-items: center; gap: 16px;
+  background: #E3F2FD; border: 1.5px solid #90CAF9;
+  border-radius: var(--radius); padding: 18px 22px;
+  margin-bottom: 24px; flex-wrap: wrap;
+}
+.connect-banner-icon { font-size: 32px; flex-shrink: 0; }
+.connect-banner > div { flex: 1; min-width: 0; }
+.connect-banner strong { font-size: 15px; font-weight: 700; color: #1565C0; }
+.connect-banner p { font-size: 13px; color: #1565C0; margin-top: 4px; }
+
+/* ===================================================
+   接続状況グリッド
+   =================================================== */
+.connection-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px; margin-bottom: 24px;
+}
+.conn-card {
+  display: flex; align-items: flex-start; gap: 10px;
+  border-radius: var(--radius-sm); padding: 12px 14px;
+  background: var(--bg-card); box-shadow: var(--shadow);
+  border-left: 4px solid var(--border);
+}
+.conn-card.conn-ok  { border-left-color: var(--primary-light); }
+.conn-card.conn-ng  { border-left-color: var(--risk-med); }
+.conn-icon { font-size: 18px; flex-shrink: 0; line-height: 1.4; }
+.conn-title { font-size: 13px; font-weight: 600; color: var(--text); }
+.conn-detail { font-size: 11px; color: var(--text-sub); margin-top: 2px; }
+
+/* ===================================================
+   全幅データなし表示
+   =================================================== */
+.no-data-section {
+  display: flex; justify-content: center;
+  padding: 40px 20px; margin-bottom: 20px;
+}
+.no-data-section-inner {
+  text-align: center; max-width: 480px;
+}
+.no-data-section-inner h3 {
+  font-size: 18px; font-weight: 700; color: var(--text); margin: 16px 0 8px;
+}
+.no-data-section-inner p { font-size: 13px; color: var(--text-sub); line-height: 1.7; }
