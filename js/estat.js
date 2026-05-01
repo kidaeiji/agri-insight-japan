@@ -376,8 +376,13 @@ function scoreTable(table, must, bonus, penalty=[]) {
   for (const w of bonus)   { if (txt.includes(w))  score+=5; }
   for (const w of penalty) { if (txt.includes(w))  score-=15; }
   if (/\d+年産/.test(txt)) score -= 30;
-  const d = parseInt(table.SURVEY_DATE||'0',10);
-  score += Math.max(0, Math.floor((d-200000)/10000));
+  // SURVEY_DATE は YYYYMM 形式（例:'202312'）→ 先頭4桁を年として取得
+  // 旧コードは 8桁想定の計算式で 2000年以降すべてスコア0になるバグがあったため修正
+  const sd = String(table.SURVEY_DATE || '0').replace(/\D/g, '');
+  const surveyYear = sd.length >= 4 ? parseInt(sd.slice(0, 4), 10) : 0;
+  if (surveyYear >= 1990 && surveyYear <= 2030) {
+    score += (surveyYear - 1990) * 2; // 1990→0, 2000→20, 2015→50, 2023→66
+  }
   return score;
 }
 
