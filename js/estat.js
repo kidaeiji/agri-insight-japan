@@ -397,7 +397,7 @@ async function findBestTableId(client, searchWord, must, bonus=[], penalty=[]) {
 
 async function fetchTableData(client, tableId, extraParams={}) {
   const tries = [
-    { cdTimeFrom:'2000000000', cdTimeTo:'2024000000', ...extraParams },
+    { cdTimeFrom:'2000000000', cdTimeTo:'2030000000', ...extraParams },
     { ...extraParams },
   ];
   for (const params of tries) {
