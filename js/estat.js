@@ -1,5 +1,10 @@
 // ===================================================
-// e-Stat API クライアント & データ統合モジュール v7
+// e-Stat API クライアント & データ統合モジュール v8
+// 修正内容:
+//   1. normalizeUnit() - 全角単位(千ｔ,％,ｈａ)→半角に変換
+//   2. buildYearCodeMap() / extractWithCatYear() - 年がカテゴリに入るテーブル対応
+//   3. parseMetricYearCat() - 野菜テーブルの cat2='収穫量_YYYY年産' 形式対応
+//   4. tryByUnit/tryByUnitWithFallback に minPoints パラメータ追加（センサス=1点OK）
 // ===================================================
 
 const ESTAT_BASE = 'https://api.e-stat.go.jp/rest/3.0/app/json';
@@ -52,8 +57,15 @@ class EStatClient {
 // ===================================================
 function parseYear(code) { return parseInt(String(code).slice(0, 4), 10); }
 
+// Fix 1: 全角ASCII → 半角変換（e-Stat は '千ｔ','％','ｈａ' などの全角単位を返す）
+function normalizeUnit(unit) {
+  return (unit || '').trim()
+    .replace(/[！-～]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
+    .replace(/\s+/g, '');
+}
+
 function normalizeValue(raw, unit) {
-  const u = (unit || '').trim().replace(/\s/g, '');
+  const u = normalizeUnit(unit); // 全角→半角を内部でも適用
   if (u === 't'   || u === 'トン')   return raw / 10000;
   if (u === '千t' || u === '千トン') return raw / 10;
   if (u === '万t' || u === '万トン') return raw;
@@ -74,7 +86,7 @@ function normalizeValue(raw, unit) {
 }
 
 // ===================================================
-// 単位タイプベースフィルタ (v6)
+// 単位タイプベースフィルタ
 // ===================================================
 const UNIT_SETS = {
   weight:  new Set(['t','トン','千t','千トン','万t','万トン','kg']),
@@ -84,7 +96,6 @@ const UNIT_SETS = {
   body:    new Set(['経営体','千経営体','万経営体']),
 };
 
-// 全エリアコード候補（国コード違いに備えて広く試す）
 const ALL_AREA_CODES = ['00000','00','0','000','0000','000000',null];
 
 function buildYearMapByUnit(values, unitType, areaCode, catFilters) {
@@ -93,7 +104,7 @@ function buildYearMapByUnit(values, unitType, areaCode, catFilters) {
   catFilters = catFilters || [];
   const map = {};
   for (const v of values) {
-    const unit = (v['@unit'] || '').trim().replace(/\s+/g, '');
+    const unit = normalizeUnit(v['@unit']); // Fix 1: normalizeUnit
     if (accepted.size > 0 && !accepted.has(unit)) continue;
     const raw = parseFloat(v['$']);
     if (isNaN(raw) || raw < 0) continue;
@@ -109,7 +120,6 @@ function buildYearMapByUnit(values, unitType, areaCode, catFilters) {
   return map;
 }
 
-// 単位不問フォールバック（センサス等で単位が空の場合用）
 function buildYearMapNoUnit(values, areaCode, catFilters) {
   if (!Array.isArray(values) || !values.length) return {};
   catFilters = catFilters || [];
@@ -121,7 +131,7 @@ function buildYearMapNoUnit(values, areaCode, catFilters) {
     if (catFilters.some(f => v[f.key] != null && v[f.key] !== f.value)) continue;
     const year = parseYear(v['@time']);
     if (year < 1990 || year > 2030) continue;
-    const unit = (v['@unit'] || '').trim();
+    const unit = normalizeUnit(v['@unit']); // Fix 1
     const val = parseFloat(normalizeValue(raw, unit).toFixed(4));
     if (val <= 0) continue;
     if (map[year] === undefined || val > map[year]) map[year] = val;
@@ -151,11 +161,12 @@ function sumCodesPerYear(values, catKey, codes, extraFilter, areaCodes) {
   return sums;
 }
 
-function tryByUnit(values, unitType, areaCodes, catFilterSets) {
+// Fix 4: minPoints パラメータを追加
+function tryByUnit(values, unitType, areaCodes, catFilterSets, minPoints = 2) {
   for (const ac of areaCodes) {
     for (const cf of catFilterSets) {
       const m = buildYearMapByUnit(values, unitType, ac, cf);
-      if (Object.keys(m).length >= 2) {
+      if (Object.keys(m).length >= minPoints) {
         console.log(`[e-Stat] OK unit=${unitType} area=${ac} → ${Object.keys(m).length}年`);
         return m;
       }
@@ -164,21 +175,141 @@ function tryByUnit(values, unitType, areaCodes, catFilterSets) {
   return {};
 }
 
-// 単位ベース失敗時に単位不問でリトライ
-function tryByUnitWithFallback(values, unitType, areaCodes, catFilterSets) {
-  const m = tryByUnit(values, unitType, areaCodes, catFilterSets);
-  if (Object.keys(m).length >= 2) return m;
-  // 単位不問フォールバック
+function tryByUnitWithFallback(values, unitType, areaCodes, catFilterSets, minPoints = 2) {
+  const m = tryByUnit(values, unitType, areaCodes, catFilterSets, minPoints);
+  if (Object.keys(m).length >= minPoints) return m;
   for (const ac of areaCodes) {
     for (const cf of catFilterSets) {
       const m2 = buildYearMapNoUnit(values, ac, cf);
-      if (Object.keys(m2).length >= 2) {
+      if (Object.keys(m2).length >= minPoints) {
         console.log(`[e-Stat] OK (no-unit fallback) area=${ac} → ${Object.keys(m2).length}年`);
         return m2;
       }
     }
   }
   return {};
+}
+
+// ===================================================
+// Fix 2: 年カテゴリ対応ユーティリティ
+// （@time が無効で年がカテゴリ名に埋め込まれているテーブル用）
+// ===================================================
+
+// カテゴリ名から年度→コード逆引きマップを構築
+// 例: '2020年度' → { '001': 2020 }
+function buildYearCodeMap(classObj) {
+  const cls = getClasses(classObj);
+  const map = {};
+  for (const c of cls) {
+    const name = c['@name'] || '';
+    let year = null;
+    const m1 = name.match(/(\d{4})年度?/);   if (m1) year = parseInt(m1[1]);
+    const m2 = name.match(/\((\d{4})\)/);    if (m2 && !year) year = parseInt(m2[1]);
+    const m3 = name.match(/^(\d{4})年産/);   if (m3 && !year) year = parseInt(m3[1]);
+    if (year && year >= 1900 && year <= 2030) map[c['@code']] = year;
+  }
+  return Object.keys(map).length > 0 ? map : null;
+}
+
+// @time が有効な年データを持つか確認
+function hasValidTimeData(values, sampleSize = 80) {
+  if (!Array.isArray(values) || !values.length) return false;
+  const sample = values.slice(0, sampleSize);
+  const valid = sample.filter(v => {
+    const y = parseYear(v['@time']);
+    return y >= 1990 && y <= 2030;
+  });
+  return valid.length >= Math.min(5, Math.ceil(sample.length * 0.4));
+}
+
+// 年カテゴリキーを使って年ごとにマップを構築
+function buildYearMapByCatYear(values, catYearKey, yearCodeMap, unitType, areaCode, catFilters) {
+  if (!Array.isArray(values) || !values.length) return {};
+  const accepted = UNIT_SETS[unitType] || new Set();
+  catFilters = catFilters || [];
+  const map = {};
+  for (const v of values) {
+    const catCode = v[catYearKey];
+    const year = yearCodeMap[catCode];
+    if (!year || year < 1990 || year > 2030) continue;
+    const unit = normalizeUnit(v['@unit']);
+    if (accepted.size > 0 && !accepted.has(unit)) continue;
+    const raw = parseFloat(v['$']);
+    if (isNaN(raw) || raw < 0) continue;
+    if (unitType === 'percent' && raw > 1000) continue;
+    if (areaCode != null && v['@area'] != null && v['@area'] !== areaCode) continue;
+    if (catFilters.some(f => v[f.key] != null && v[f.key] !== f.value)) continue;
+    const val = parseFloat(normalizeValue(raw, unit).toFixed(4));
+    if (val <= 0) continue;
+    if (map[year] === undefined || val > map[year]) map[year] = val;
+  }
+  return map;
+}
+
+// 年カテゴリ次元を自動検出して年マップを返す汎用ヘルパー
+function extractWithCatYear(values, classObjs, unitType, cropCatKey, cropCode, minPoints = 1) {
+  for (const catId of ['cat01', 'cat02', 'cat03']) {
+    const obj = findClassObj(classObjs, catId);
+    if (!obj) continue;
+    const yearMap = buildYearCodeMap(obj);
+    if (!yearMap || Object.keys(yearMap).length < 2) continue;
+    const catYearKey = '@' + catId;
+
+    const catFilters = [];
+    if (cropCode && cropCatKey && cropCatKey !== catYearKey) {
+      catFilters.push({ key: cropCatKey, value: cropCode });
+    }
+
+    // エリアコードを試す
+    for (const ac of ALL_AREA_CODES) {
+      const m = buildYearMapByCatYear(values, catYearKey, yearMap, unitType, ac, catFilters);
+      if (Object.keys(m).length >= minPoints) {
+        console.log(`[e-Stat] OK(catYear cat=${catId}) area=${ac} → ${Object.keys(m).length}年`);
+        return m;
+      }
+    }
+    // エリアフィルタなし
+    const m = buildYearMapByCatYear(values, catYearKey, yearMap, unitType, null, catFilters);
+    if (Object.keys(m).length >= minPoints) {
+      console.log(`[e-Stat] OK(catYear/noArea cat=${catId}) → ${Object.keys(m).length}年`);
+      return m;
+    }
+  }
+  return {};
+}
+
+// ===================================================
+// Fix 3: cat2='指標_YYYY年産' 形式のパース（野菜統計テーブル用）
+// ===================================================
+function parseMetricYearCat(classObj) {
+  const cls = getClasses(classObj);
+  const result = [];
+  for (const c of cls) {
+    const name = c['@name'] || '';
+    // '収穫量_2015年産' or '作付面積_2015年産' 形式
+    const m = name.match(/^(.+)[_＿](\d{4})年産?$/);
+    if (m) result.push({ code: c['@code'], metric: m[1].trim(), year: parseInt(m[2]) });
+  }
+  return result;
+}
+
+// cat2-year エントリのコード→年マップから値を集計
+function buildYearMapFromCat2Year(values, codeToYear, unitType, cropCatKey, cropCode) {
+  const accepted = UNIT_SETS[unitType] || new Set();
+  const map = {};
+  for (const v of values) {
+    if (cropCode && v[cropCatKey] !== cropCode) continue;
+    const year = codeToYear[v['@cat02']];
+    if (!year || year < 1990 || year > 2030) continue;
+    const unit = normalizeUnit(v['@unit']);
+    if (accepted.size > 0 && !accepted.has(unit) && unit !== '') continue;
+    const raw = parseFloat(v['$']);
+    if (isNaN(raw) || raw <= 0) continue;
+    const val = parseFloat(normalizeValue(raw, unit).toFixed(4));
+    if (val <= 0) continue;
+    if (map[year] === undefined || val > map[year]) map[year] = val;
+  }
+  return map;
 }
 
 // ===================================================
@@ -244,7 +375,6 @@ function scoreTable(table, must, bonus, penalty=[]) {
   for (const w of must)    { if (!txt.includes(w)) return -9999; score+=10; }
   for (const w of bonus)   { if (txt.includes(w))  score+=5; }
   for (const w of penalty) { if (txt.includes(w))  score-=15; }
-  // 単年テーブル（「〇年産」パターン）を強くペナルティ
   if (/\d+年産/.test(txt)) score -= 30;
   const d = parseInt(table.SURVEY_DATE||'0',10);
   score += Math.max(0, Math.floor((d-200000)/10000));
@@ -265,7 +395,6 @@ async function findBestTableId(client, searchWord, must, bonus=[], penalty=[]) {
   return null;
 }
 
-// テーブルデータ取得（エリア有・無 + 時刻有・無でフォールバック）
 async function fetchTableData(client, tableId, extraParams={}) {
   const tries = [
     { cdTimeFrom:'2000000000', cdTimeTo:'2024000000', ...extraParams },
@@ -285,10 +414,8 @@ async function fetchTableData(client, tableId, extraParams={}) {
 
 // ===================================================
 // 【食料需給表】各指標を専用検索で取得
-// 単一の「総合テーブル」ではなく指標ごとに最適テーブルを探す
 // ===================================================
 async function fetchFoodBalance(client) {
-  // 指標ごとの検索戦略
   const METRIC_STRATEGIES = {
     production: [
       { word:'食料需給表 国内生産量 品目別', must:['食料需給'], bonus:['国内生産量','品目'], penalty:['内訳','穀類の','飼料'] },
@@ -322,8 +449,7 @@ async function fetchFoodBalance(client) {
     production:'weight', imports:'weight', consumption:'weight', selfSufficiency:'percent',
   };
 
-  // 指標ごとに最適テーブルを取得してデータをマージ
-  const metricData = {}; // { production: {rice:[...], wheat:[...],...}, ... }
+  const metricData = {};
 
   for (const [metricKey, strategies] of Object.entries(METRIC_STRATEGIES)) {
     let tableId=null;
@@ -341,33 +467,45 @@ async function fetchFoodBalance(client) {
     console.log(`[e-Stat] 食料需給表:${metricKey} VALUES=${values.length} id=${tableId}`);
 
     const classObjs = sd?.CLASS_INF?.CLASS_OBJ;
-    // cat01~cat03 を全部確認してどのカテゴリが品目かを自動判定
     const allCats = ['cat01','cat02','cat03'].map(id => ({ id, obj: findClassObj(classObjs, id) })).filter(x=>x.obj);
     allCats.forEach(c => logClasses(c.obj, `食料需給表:${metricKey} ${c.id}`));
+
+    // Fix 2: @time が有効かチェック。無効ならカテゴリから年を取る
+    const timeValid = hasValidTimeData(values);
+    console.log(`[e-Stat] 食料需給表:${metricKey} timeValid=${timeValid}`);
 
     const unitType = UNIT_FOR[metricKey];
     metricData[metricKey] = {};
 
     for (const [cropKey, cropKws] of Object.entries(CROP_KW)) {
-      // 全カテゴリから品目コードを探す
       let cropCode=null, cropCatKey=null;
       for (const {id, obj} of allCats) {
         const c = findCode(obj, ...cropKws);
         if (c) { cropCode=c; cropCatKey='@'+id; break; }
       }
 
-      const catFilterSets = [];
-      if (cropCode) catFilterSets.push([{key:cropCatKey, value:cropCode}]);
-      catFilterSets.push([]); // unit typeが守る
+      let map = {};
 
-      const map = tryByUnit(values, unitType, ALL_AREA_CODES, catFilterSets);
+      if (timeValid) {
+        // 通常アプローチ（Fix 1 により全角単位も正しく比較される）
+        const catFilterSets = [];
+        if (cropCode) catFilterSets.push([{key:cropCatKey, value:cropCode}]);
+        catFilterSets.push([]);
+        map = tryByUnit(values, unitType, ALL_AREA_CODES, catFilterSets);
+      }
+
+      // @time が無効、または通常アプローチで取得できなかった場合はカテゴリ年で再試行
+      if (Object.keys(map).length < 2) {
+        const catMap = extractWithCatYear(values, classObjs, unitType, cropCatKey, cropCode);
+        if (Object.keys(catMap).length >= 2) map = catMap;
+      }
+
       const list = yearMapToList(map);
-      if (list.length>=2) metricData[metricKey][cropKey] = list;
+      if (list.length >= 2) metricData[metricKey][cropKey] = list;
     }
     console.log(`[e-Stat] 食料需給表:${metricKey} 取得品目=${Object.keys(metricData[metricKey]).join(',')}`);
   }
 
-  // 品目×指標 のマトリクスを作成
   const result = {};
   for (const [metricKey, cropMap] of Object.entries(metricData)) {
     for (const [cropKey, list] of Object.entries(cropMap)) {
@@ -413,7 +551,6 @@ async function fetchGrainStats(client, cropKws, cropLabel) {
   if (cat01) logClasses(cat01, `${cropLabel} cat01`);
   if (cat02) logClasses(cat02, `${cropLabel} cat02`);
 
-  // 品目コードを全カテゴリから探す
   let cropCode=null, cropCatKey=null;
   for (const [id,obj] of [['@cat01',cat01],['@cat02',cat02]]) {
     if (!obj) continue;
@@ -423,8 +560,18 @@ async function fetchGrainStats(client, cropKws, cropLabel) {
   const cropFilter = cropCode ? [{key:cropCatKey, value:cropCode}] : [];
   const filterSets = cropFilter.length ? [cropFilter,[]] : [[]];
 
-  const harvest = yearMapToList(tryByUnit(values,'weight',ALL_AREA_CODES,filterSets));
-  const area    = yearMapToList(tryByUnit(values,'area',  ALL_AREA_CODES,filterSets));
+  let harvest = yearMapToList(tryByUnit(values,'weight',ALL_AREA_CODES,filterSets));
+  let area    = yearMapToList(tryByUnit(values,'area',  ALL_AREA_CODES,filterSets));
+
+  // Fix 2: 通常アプローチ失敗時はカテゴリ年で再試行
+  if (!harvest.length) {
+    const m = extractWithCatYear(values, classObjs, 'weight', cropCatKey, cropCode);
+    harvest = yearMapToList(m);
+  }
+  if (!area.length) {
+    const m = extractWithCatYear(values, classObjs, 'area', cropCatKey, cropCode);
+    area = yearMapToList(m);
+  }
 
   console.log(`[e-Stat] ${cropLabel} harvest=${harvest.length}年 area=${area.length}年`);
   if (!harvest.length) return null;
@@ -467,7 +614,6 @@ async function fetchVegetableStat(client, vegKws, vegLabel) {
   if (cat01) logClasses(cat01, `${vegLabel} cat01`);
   if (cat02) logClasses(cat02, `${vegLabel} cat02`);
 
-  // 品目コードを全カテゴリから探す
   let vegCode=null, vegCatKey=null;
   for (const [id,obj] of [['@cat01',cat01],['@cat02',cat02]]) {
     if (!obj) continue;
@@ -477,16 +623,15 @@ async function fetchVegetableStat(client, vegKws, vegLabel) {
   const vegFilter = vegCode ? [{key:vegCatKey, value:vegCode}] : [];
   const filterSets = vegFilter.length ? [vegFilter,[]] : [[]];
 
-  const harvest = yearMapToList(tryByUnit(values,'weight',ALL_AREA_CODES,filterSets));
-  const area    = yearMapToList(tryByUnit(values,'area',  ALL_AREA_CODES,filterSets));
+  let harvestFinal = yearMapToList(tryByUnit(values,'weight',ALL_AREA_CODES,filterSets));
+  let areaFinal    = yearMapToList(tryByUnit(values,'area',  ALL_AREA_CODES,filterSets));
 
   // 都道府県別テーブルで国コードが見つからない場合: 都道府県合計を算出
-  let harvestFinal=harvest, areaFinal=area;
-  if (!harvest.length) {
+  if (!harvestFinal.length) {
     console.log(`[e-Stat] ${vegLabel} 国コードNG→都道府県合計を試みる`);
     const sumMap = {};
     for (const v of values) {
-      const unit=(v['@unit']||'').trim().replace(/\s+/g,'');
+      const unit = normalizeUnit(v['@unit']); // Fix 1
       if (!UNIT_SETS.weight.has(unit)) continue;
       if (vegFilter.length && vegFilter.some(f=>v[f.key]!=null&&v[f.key]!==f.value)) continue;
       const raw=parseFloat(v['$']); if(isNaN(raw)||raw<=0) continue;
@@ -494,15 +639,13 @@ async function fetchVegetableStat(client, vegKws, vegLabel) {
       const val=parseFloat(normalizeValue(raw,unit).toFixed(4)); if(val<=0) continue;
       sumMap[year]=(sumMap[year]||0)+val;
     }
-    // 合計が国計より明らかに大きい（都道府県重複なし）か判断不能のため、
-    // 最大の1件より大きい合計なら都道府県合計として採用
     const sumList=yearMapToList(sumMap);
     if(sumList.length>=2) harvestFinal=sumList;
   }
-  if (!area.length) {
+  if (!areaFinal.length) {
     const sumMap={};
     for (const v of values) {
-      const unit=(v['@unit']||'').trim().replace(/\s+/g,'');
+      const unit = normalizeUnit(v['@unit']); // Fix 1
       if (!UNIT_SETS.area.has(unit)) continue;
       if (vegFilter.length && vegFilter.some(f=>v[f.key]!=null&&v[f.key]!==f.value)) continue;
       const raw=parseFloat(v['$']); if(isNaN(raw)||raw<=0) continue;
@@ -512,6 +655,30 @@ async function fetchVegetableStat(client, vegKws, vegLabel) {
     }
     const sumList=yearMapToList(sumMap);
     if(sumList.length>=2) areaFinal=sumList;
+  }
+
+  // Fix 3: cat2='収穫量_YYYY年産' 形式のフォールバック
+  if (!harvestFinal.length && cat02) {
+    const metricYears = parseMetricYearCat(cat02);
+    if (metricYears.length > 0) {
+      console.log(`[e-Stat] ${vegLabel} cat2-year形式を試みる (${metricYears.length}エントリ)`);
+      const harvestEntries = metricYears.filter(e => e.metric.includes('収穫量'));
+      const areaEntries    = metricYears.filter(e => e.metric.includes('作付面積') || e.metric.includes('収穫面積'));
+
+      if (harvestEntries.length > 0) {
+        const codeToYear = Object.fromEntries(harvestEntries.map(e => [e.code, e.year]));
+        const hmap = buildYearMapFromCat2Year(values, codeToYear, 'weight', vegCatKey||'@cat01', vegCode);
+        const hlist = yearMapToList(hmap);
+        if (hlist.length >= 1) harvestFinal = hlist;
+      }
+
+      if (!areaFinal.length && areaEntries.length > 0) {
+        const codeToYear = Object.fromEntries(areaEntries.map(e => [e.code, e.year]));
+        const amap = buildYearMapFromCat2Year(values, codeToYear, 'area', vegCatKey||'@cat01', vegCode);
+        const alist = yearMapToList(amap);
+        if (alist.length >= 1) areaFinal = alist;
+      }
+    }
   }
 
   console.log(`[e-Stat] ${vegLabel} harvest=${harvestFinal.length}年 area=${areaFinal.length}年`);
@@ -559,11 +726,9 @@ async function fetchAgriWorkers(client) {
   if (cat01) logClasses(cat01,'農業就業人口 cat01');
   if (cat02) logClasses(cat02,'農業就業人口 cat02');
 
-  // 性別:合計コードを探す（存在すればcat02フィルタに使用）
   const genderTotalCode = cat02 ? findCode(cat02,'合計','計','総数') : null;
   const genderFilter = (cat02 && genderTotalCode) ? {key:'@cat02', value:genderTotalCode} : null;
 
-  // 合計コードを全カテゴリから探す
   const TOTAL_KW=['計','合計','総数','農業就業人口','農業就業者数'];
   let totalCode=null, totalCatKey=null;
   for (const [id,obj] of [['@cat01',cat01],['@cat02',cat02]]) {
@@ -571,6 +736,7 @@ async function fetchAgriWorkers(client) {
     const c=findCode(obj,...TOTAL_KW); if(c){totalCode=c;totalCatKey=id;break;}
   }
 
+  // Fix 4: センサスは1点でもOK（minPoints=1）
   const buildTotal = () => {
     const catFilterSets=[];
     if (totalCode) {
@@ -579,15 +745,13 @@ async function fetchAgriWorkers(client) {
       catFilterSets.push(f);
     }
     catFilterSets.push([]);
-    return yearMapToList(tryByUnitWithFallback(values,'people',ALL_AREA_CODES,catFilterSets));
+    return yearMapToList(tryByUnitWithFallback(values,'people',ALL_AREA_CODES,catFilterSets,1));
   };
 
-  // 年齢別: cat01のラベルを解析して年齢帯コードを自動抽出
   const cls1 = getClasses(cat01);
   const ageCodeGroups = { under49:[], age5064:[], over65:[] };
   for (const c of cls1) {
     const n = c['@name']||'';
-    // "X～Y歳" パターン
     const m = n.match(/^(\d+)[\s～〜~ー]+(\d+)歳/);
     if (m) {
       const lo=parseInt(m[1]);
@@ -596,10 +760,8 @@ async function fetchAgriWorkers(client) {
       else            ageCodeGroups.over65.push(c['@code']);
       continue;
     }
-    // "X歳以上" パターン
     const m2 = n.match(/^(\d+)歳以上/);
     if (m2 && parseInt(m2[1])>=65) { ageCodeGroups.over65.push(c['@code']); continue; }
-    // 集計系キーワード
     if (/49歳以下|15〜49|15～49/.test(n)) ageCodeGroups.under49.push(c['@code']);
     if (/50〜64|50～64/.test(n))          ageCodeGroups.age5064.push(c['@code']);
     if (/65歳以上|65〜|65～/.test(n))     ageCodeGroups.over65.push(c['@code']);
@@ -622,7 +784,6 @@ async function fetchAgriWorkers(client) {
   if(age5064.length) byAge.age5064=age5064;
   if(over65.length)  byAge.over65=over65;
 
-  // 合計が取れず年齢別が揃っていれば再合成
   let finalTotal=total;
   if (!total.length && Object.keys(byAge).length===3) {
     const allYears=[...new Set([...under49,...age5064,...over65].map(d=>d.year))].sort((a,b)=>a-b);
@@ -681,7 +842,8 @@ async function fetchAgriBodies(client) {
   }
   const catFilterSets=code ? [[{key:catKey,value:code}],[]] : [[]];
 
-  const map = tryByUnitWithFallback(values,'body',ALL_AREA_CODES,catFilterSets);
+  // Fix 4: センサスは1点でもOK（minPoints=1）
+  const map = tryByUnitWithFallback(values,'body',ALL_AREA_CODES,catFilterSets,1);
   const list = interpolateList(yearMapToList(map));
 
   console.log(`[e-Stat] 農業経営体数 ${list.length}年分`);
